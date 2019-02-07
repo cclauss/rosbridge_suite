@@ -33,58 +33,94 @@
 
 import fnmatch
 import socket
-from rosservice import get_service_list
-from rosservice import get_service_type as rosservice_get_service_type
-from rosservice import get_service_node as rosservice_get_service_node
-from rosservice import get_service_uri
-from rosservice import rosservice_find
-from rostopic import find_by_type
-from rostopic import get_topic_type as rosservice_get_topic_type
-from rosnode import get_node_names
-from rosgraph.masterapi import Master
+
+from ros2cli.node.strategy import NodeStrategy
+from ros2service.api import get_service_names, get_service_names_and_types
+from ros2topic.api import get_topic_names, get_topic_names_and_types
+
+# from rosservice import get_service_list
+# from rosservice import get_service_type as rosservice_get_service_type
+# from rosservice import get_service_node as rosservice_get_service_node
+# from rosservice import get_service_uri
+# from rosservice import rosservice_find
+# from rostopic import find_by_type
+# from rostopic import get_topic_type as rosservice_get_topic_type
+# from ros import rosnode, rosgraph
+# from rosnode import get_node_names
+# from rosgraph.masterapi import Master
 
 from rosapi.msg import TypeDef
 
 from .glob_helper import filter_globs, any_match
 
 
-def get_topics_and_types(topics_glob):
+def get_topics(topics_glob):
     """ Returns a list of all the active topics in the ROS system """
     try:
-        # Function getTopicTypes also returns inactive topics and does not
-        # return topics with unknown message types, so it must be compared
-        # to results from getSystemState.
-        master = Master('/rosbridge')
-        topic_types = master.getTopicTypes()
-        publishers, subscribers, services = master.getSystemState()
-        topics = set([x for x, _ in publishers] + [x for x, _ in subscribers])
-
-        # Filter the list of topics by whether they are public.
-        topics = set(filter_globs(topics_glob, topics))
-        topic_types = [x for x in topic_types if x[0] in topics]
-
-        # Add topics with unknown type messages.
-        unknown_type = topics.difference([x for x, _ in topic_types])
-        return zip(* topic_types + [[x,''] for x in unknown_type])
+        with NodeStrategy(args=None) as node:
+            topic_names = get_topic_names(node=node, include_hidden_topics=False)
+            return filter_globs(topics_glob, topic_names)
     except:
         return []
 
 
-def get_topics_for_type(type, topics_glob):
-    # Filter the list of topics by whether they are public before returning.
-    return filter_globs(topics_glob, find_by_type(type))
+def get_topics_types(topics, topics_glob):
+    try:
+        types = []
+        for i in topics:
+            types.append(get_topic_type(i, topics_glob))
+        return types
+    except:
+        return[]
+
+
+def get_topics_and_types(topics_glob):
+    try:
+        with NodeStrategy(args=None) as node:
+            topic_names_and_types = get_topic_names_and_types(node=node, include_hidden_topics=False)
+            # topic[0] has the topic name and topic[1] has the type wrapped in a list.
+            all_topics = set([topic[0] for topic in topic_names_and_types])
+            filtered_topics = set(filter_globs(topics_glob, all_topics))
+            filtered_topic_types = [topic[1][0] for topic in topic_names_and_types if topic[0] in filtered_topics]
+            return filtered_topics, filtered_topic_types
+    except:
+        return [], []
+
+
+def get_topics_for_type(topic_type, topics_glob):
+    try:
+        with NodeStrategy(args=None) as node:
+            topic_names_and_types = get_topic_names_and_types(node=node, include_hidden_topics=False)
+            # topic[0] has the topic name and topic[1] has the type wrapped in a list.
+            topics_for_type = [topic[0] for topic in topic_names_and_types if topic[1][0] == topic_type]
+            return filter_globs(topics_glob, topics_for_type)
+    except:
+        return []
 
 
 def get_services(services_glob):
     """ Returns a list of all the services advertised in the ROS system """
     # Filter the list of services by whether they are public before returning.
-    return filter_globs(services_glob, get_service_list())
+    try:
+        with NodeStrategy(args=None) as node:
+            service_names = get_service_names(node=node, include_hidden_services=False)
+            return filter_globs(services_glob, service_names)
+    except:
+        return []
 
 
 def get_services_for_type(service_type, services_glob):
     """ Returns a list of services as specific service type """
     # Filter the list of services by whether they are public before returning.
-    return filter_globs(services_glob, rosservice_find(service_type))
+
+    try:
+        with NodeStrategy(args=None) as node:
+            services_names_and_types = get_service_names_and_types(node=node, include_hidden_services=False)
+            # service[0] has the topic name and service[1] has the type wrapped in a list.
+            services_for_type = [service[0] for service in services_names_and_types if service[1][0] == service_type]
+            return filter_globs(services_glob, services_for_type)
+    except:
+        return []
 
 
 def get_nodes():

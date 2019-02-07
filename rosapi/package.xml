@@ -22,7 +22,12 @@
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
   <exec_depend>rclpy</exec_depend>
-  <exec_depend>rosbridge_library</exec_depend>
+  <!-- TODO: add rosbridge_library again -->
+  <!-- <exec_depend>rosbridge_library</exec_depend> -->
+  
+  <exec_depend>ros2cli</exec_depend>
+  <exec_depend>ros2service</exec_depend>
+  <exec_depend>ros2topic</exec_depend>
   <!--
   <exec_depend>rosnode</exec_depend>
   <exec_depend>rosgraph</exec_depend>

@@ -25,7 +25,6 @@
   <!-- TODO: add rosbridge_library again -->
   <!-- <exec_depend>rosbridge_library</exec_depend> -->
   
-  <exec_depend>ros2cli</exec_depend>
   <exec_depend>ros2node</exec_depend>
   <exec_depend>ros2service</exec_depend>
   <exec_depend>ros2topic</exec_depend>

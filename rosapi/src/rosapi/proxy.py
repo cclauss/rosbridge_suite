@@ -34,9 +34,6 @@
 import fnmatch
 import socket
 
-from ros2cli.node.daemon import DaemonNode
-from ros2cli.node.direct import DirectNode
-from ros2cli.node.strategy import NodeStrategy
 from ros2node.api import get_node_names, get_publisher_info, get_service_info, get_subscriber_info
 from ros2service.api import get_service_names, get_service_names_and_types
 from ros2topic.api import get_topic_names, get_topic_names_and_types
@@ -56,13 +53,21 @@ from rosapi.msg import TypeDef
 
 from .glob_helper import filter_globs, any_match
 
+_node = None
+
+def init(node):
+    """
+    Initializes proxy module with a rclpy.node.Node for further use.
+    This function has to be called before any other for the module to work.
+    """
+    global _node
+    _node = node
 
 def get_topics(topics_glob):
     """ Returns a list of all the active topics in the ROS system """
     try:
-        with NodeStrategy(args=None) as node:
-            topic_names = get_topic_names(node=node, include_hidden_topics=False)
-            return filter_globs(topics_glob, topic_names)
+        topic_names = get_topic_names(node=_node, include_hidden_topics=False)
+        return filter_globs(topics_glob, topic_names)
     except:
         return []
 
@@ -79,24 +84,22 @@ def get_topics_types(topics, topics_glob):
 
 def get_topics_and_types(topics_glob):
     try:
-        with NodeStrategy(args=None) as node:
-            topic_names_and_types = get_topic_names_and_types(node=node, include_hidden_topics=False)
-            # topic[0] has the topic name and topic[1] has the type wrapped in a list.
-            all_topics = set([topic[0] for topic in topic_names_and_types])
-            filtered_topics = set(filter_globs(topics_glob, all_topics))
-            filtered_topic_types = [topic[1][0] for topic in topic_names_and_types if topic[0] in filtered_topics]
-            return filtered_topics, filtered_topic_types
+        topic_names_and_types = get_topic_names_and_types(node=_node, include_hidden_topics=False)
+        # topic[0] has the topic name and topic[1] has the type wrapped in a list.
+        all_topics = set([topic[0] for topic in topic_names_and_types])
+        filtered_topics = set(filter_globs(topics_glob, all_topics))
+        filtered_topic_types = [topic[1][0] for topic in topic_names_and_types if topic[0] in filtered_topics]
+        return filtered_topics, filtered_topic_types
     except:
         return [], []
 
 
 def get_topics_for_type(topic_type, topics_glob):
     try:
-        with NodeStrategy(args=None) as node:
-            topic_names_and_types = get_topic_names_and_types(node=node, include_hidden_topics=False)
-            # topic[0] has the topic name and topic[1] has the type wrapped in a list.
-            topics_for_type = [topic[0] for topic in topic_names_and_types if topic[1][0] == topic_type]
-            return filter_globs(topics_glob, topics_for_type)
+        topic_names_and_types = get_topic_names_and_types(node=_node, include_hidden_topics=False)
+        # topic[0] has the topic name and topic[1] has the type wrapped in a list.
+        topics_for_type = [topic[0] for topic in topic_names_and_types if topic[1][0] == topic_type]
+        return filter_globs(topics_glob, topics_for_type)
     except:
         return []
 
@@ -105,9 +108,8 @@ def get_services(services_glob):
     """ Returns a list of all the services advertised in the ROS system """
     # Filter the list of services by whether they are public before returning.
     try:
-        with NodeStrategy(args=None) as node:
-            service_names = get_service_names(node=node, include_hidden_services=False)
-            return filter_globs(services_glob, service_names)
+        service_names = get_service_names(node=_node, include_hidden_services=False)
+        return filter_globs(services_glob, service_names)
     except:
         return []
 
@@ -115,13 +117,11 @@ def get_services(services_glob):
 def get_services_for_type(service_type, services_glob):
     """ Returns a list of services as specific service type """
     # Filter the list of services by whether they are public before returning.
-
     try:
-        with NodeStrategy(args=None) as node:
-            services_names_and_types = get_service_names_and_types(node=node, include_hidden_services=False)
-            # service[0] has the topic name and service[1] has the type wrapped in a list.
-            services_for_type = [service[0] for service in services_names_and_types if service[1][0] == service_type]
-            return filter_globs(services_glob, services_for_type)
+        services_names_and_types = get_service_names_and_types(node=_node, include_hidden_services=False)
+        # service[0] has the topic name and service[1] has the type wrapped in a list.
+        services_for_type = [service[0] for service in services_names_and_types if service[1][0] == service_type]
+        return filter_globs(services_glob, services_for_type)
     except:
         return []
 
@@ -129,64 +129,52 @@ def get_services_for_type(service_type, services_glob):
 def get_nodes():
     """ Returns a list of all the nodes registered in the ROS system """
     try:
-        with NodeStrategy(args=None) as node:
-            node_names = get_node_names(node=node, include_hidden_nodes=False)
-            # Discard the node that requests the names.
-            full_names = [node_name.full_name for node_name in node_names if node_name.full_name != '/requester_rosapi_Nodes']
-            return full_names
+        node_names = get_node_names(node=_node, include_hidden_nodes=False)
+        # Discard the node that requests the names.
+        full_names = [node_name.full_name for node_name in node_names if node_name.full_name != '/requester_rosapi_Nodes']
+        return full_names
     except:
         return []
 
-def get_node_info(ros, node_name):
-    with NodeStrategy(args=None) as node:
-        node_names = get_node_names(node=node, include_hidden_nodes=True)
-        ros.get_logger().info('Node names: {}'.format(node_names))
-        if node_name in [n.full_name for n in node_names]:
-            with DirectNode(args=None) as node:
-                ros.get_logger().info(node_name)
-                print(node_name)
-                subscribers = get_subscriber_info(node=node, remote_node_name=node_name)
-                ros.get_logger().info('Subscribers: {}'.format(subscribers))
-                publishers = get_publisher_info(node=node, remote_node_name=node_name)
-                ros.get_logger().info('Publishers: {}'.format(publishers))
-                services = get_service_info(node=node, remote_node_name=node_name)
-                ros.get_logger().info('services: {}'.format(services))
+def get_node_info(node_name):
+    node_names = get_node_names(node=_node, include_hidden_nodes=True)
+    if node_name in [n.full_name for n in node_names]:
+        # Only the name of each item is required as output.
+        subscribers = get_subscriber_info(node=_node, remote_node_name=node_name)
+        subscribers = [subscriber.name for subscriber in subscribers]
 
-                return subscribers, publishers, services
+        publishers = get_publisher_info(node=_node, remote_node_name=node_name)
+        publishers = [publisher.name for publisher in publishers]
 
-def get_node_publications(ros, node_name):
+        services = get_service_info(node=_node, remote_node_name=node_name)
+        services = [service.name for service in services]
+
+        return subscribers, publishers, services
+
+def get_node_publications(node_name):
     """ Returns a list of topic names that are been published by the specified node """
     try:
-        with DirectNode(args=None) as node:
-            publisher_info = get_publisher_info(node=node, remote_node_name=node_name)
-            ros.get_logger('pub info: {}'.format(publisher_info))
-            return publisher_info
-    except Exception as e:
-        ros.get_logger().info('exception: {}'.format(e))
+        publisher_info = get_publisher_info(node=_node, remote_node_name=node_name)
+        return publisher_info
+    except:
         return []
 
 
-def get_node_subscriptions(ros, node_name):
+def get_node_subscriptions(node_name):
     """ Returns a list of topic names that are been subscribed by the specified node """
     try:
-        with DirectNode(args=None) as node:
-            subscriber_info = get_subscriber_info(node=node, remote_node_name=node_name)
-            ros.get_logger('subscriber info: {}'.format(subscriber_info))
-            return subscriber_info
-    except Exception as e:
-        ros.get_logger().info('exception: {}'.format(e))
+        subscriber_info = get_subscriber_info(node=node, remote_node_name=node_name)
+        return subscriber_info
+    except:
         return []
 
 
 def get_node_services(ros, node_name):
     """ Returns a list of service names that are been hosted by the specified node """
     try:
-        with DirectNode(args=None) as node:
-            service_info = get_service_info(node=node, remote_node_name=node_name)
-            ros.get_logger('Service info: {}'.format(service_info))
-            return service_info
-    except Exception as e:
-        ros.get_logger().info('exception: {}'.format(e))
+        service_info = get_service_info(node=_node, remote_node_name=node_name)
+        return service_info
+    except:
         return []
 
 

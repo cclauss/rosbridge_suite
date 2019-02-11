@@ -50,6 +50,7 @@ class Rosapi(Node):
 
     # Initialises the ROS node
     def register_services(self):
+        proxy.init(self)
         self.create_service(Topics, '/rosapi/topics', self.get_topics)
         self.create_service(TopicsForType, '/rosapi/topics_for_type', self.get_topics_for_type)
         self.create_service(Services, '/rosapi/services', self.get_services)
@@ -109,19 +110,11 @@ class Rosapi(Node):
 
     def get_node_details(self, request, response):
         """ Called by the rosapi/Nodes service. Returns a node description """
-        node = request.node
-        proxy.get_node_info(self, node)
-        # response.subscribing = proxy.get_node_subscriptions(self, node)
-        # response.publishing = proxy.get_node_publications(self, node)
-        # response.services = proxy.get_node_services(self, node)
-        # self.get_logger().info('Subscribing: {}, publishing: {}, services: {}'.format(response.subscribing, response.publishing, response.services))
+        response.subscribing, response.publishing, response.services = proxy.get_node_info(request.node)
         return response
 
 
 # TODO(@jubeira): make all of these methods of the node and port them.
-
-
-    
     
 def get_action_servers(request):
     """ Called by the rosapi/GetActionServers service. Returns a list of action servers based on actions standard topics """

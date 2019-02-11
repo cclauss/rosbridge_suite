@@ -54,10 +54,10 @@ class Rosapi(Node):
         self.create_service(TopicsForType, '/rosapi/topics_for_type', self.get_topics_for_type)
         self.create_service(Services, '/rosapi/services', self.get_services)
         self.create_service(ServicesForType, '/rosapi/services_for_type', self.get_services_for_type)
+        self.create_service(Nodes, '/rosapi/nodes', self.get_nodes)
+        self.create_service(NodeDetails, '/rosapi/node_details', self.get_node_details)
 
         # Topics to be implemented:
-        # rospy.Service('/rosapi/nodes', Nodes, get_nodes)
-        # rospy.Service('/rosapi/node_details', NodeDetails, get_node_details)
         # rospy.Service('/rosapi/action_servers', GetActionServers, get_action_servers)
         # rospy.Service('/rosapi/topic_type', TopicType, get_topic_type)
         # rospy.Service('/rosapi/service_type', ServiceType, get_service_type)
@@ -102,18 +102,26 @@ class Rosapi(Node):
         response.services = proxy.get_services_for_type(request.type, self.globs.get('services_glob'))
         return response
 
+    def get_nodes(self, request, response):
+        """ Called by the rosapi/Nodes service. Returns a list of all the nodes that are registered """
+        response.nodes = proxy.get_nodes()
+        return response
+
+    def get_node_details(self, request, response):
+        """ Called by the rosapi/Nodes service. Returns a node description """
+        node = request.node
+        proxy.get_node_info(self, node)
+        # response.subscribing = proxy.get_node_subscriptions(self, node)
+        # response.publishing = proxy.get_node_publications(self, node)
+        # response.services = proxy.get_node_services(self, node)
+        # self.get_logger().info('Subscribing: {}, publishing: {}, services: {}'.format(response.subscribing, response.publishing, response.services))
+        return response
+
 
 # TODO(@jubeira): make all of these methods of the node and port them.
 
 
-def get_nodes(request):
-    """ Called by the rosapi/Nodes service. Returns a list of all the nodes that are registered """
-    return NodesResponse(proxy.get_nodes())
     
-def get_node_details(request):
-    """ Called by the rosapi/Nodes service. Returns a node description """
-    node = request.node
-    return NodeDetailsResponse(proxy.get_node_subscriptions(node), proxy.get_node_publications(node), proxy.get_node_services(node))
     
 def get_action_servers(request):
     """ Called by the rosapi/GetActionServers service. Returns a list of action servers based on actions standard topics """

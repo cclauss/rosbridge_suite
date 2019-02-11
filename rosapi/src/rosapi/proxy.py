@@ -34,7 +34,10 @@
 import fnmatch
 import socket
 
+from ros2cli.node.daemon import DaemonNode
+from ros2cli.node.direct import DirectNode
 from ros2cli.node.strategy import NodeStrategy
+from ros2node.api import get_node_names, get_publisher_info, get_service_info, get_subscriber_info
 from ros2service.api import get_service_names, get_service_names_and_types
 from ros2topic.api import get_topic_names, get_topic_names_and_types
 
@@ -125,48 +128,65 @@ def get_services_for_type(service_type, services_glob):
 
 def get_nodes():
     """ Returns a list of all the nodes registered in the ROS system """
-    return get_node_names()
+    try:
+        with NodeStrategy(args=None) as node:
+            node_names = get_node_names(node=node, include_hidden_nodes=False)
+            # Discard the node that requests the names.
+            full_names = [node_name.full_name for node_name in node_names if node_name.full_name != '/requester_rosapi_Nodes']
+            return full_names
+    except:
+        return []
 
+def get_node_info(ros, node_name):
+    with NodeStrategy(args=None) as node:
+        node_names = get_node_names(node=node, include_hidden_nodes=True)
+        ros.get_logger().info('Node names: {}'.format(node_names))
+        if node_name in [n.full_name for n in node_names]:
+            with DirectNode(args=None) as node:
+                ros.get_logger().info(node_name)
+                print(node_name)
+                subscribers = get_subscriber_info(node=node, remote_node_name=node_name)
+                ros.get_logger().info('Subscribers: {}'.format(subscribers))
+                publishers = get_publisher_info(node=node, remote_node_name=node_name)
+                ros.get_logger().info('Publishers: {}'.format(publishers))
+                services = get_service_info(node=node, remote_node_name=node_name)
+                ros.get_logger().info('services: {}'.format(services))
 
-def get_node_publications(node):
+                return subscribers, publishers, services
+
+def get_node_publications(ros, node_name):
     """ Returns a list of topic names that are been published by the specified node """
     try:
-        publishers, subscribers, services = Master('/rosbridge').getSystemState()
-        toReturn = []
-        for i, v in publishers:
-            if node in v:
-                toReturn.append(i)
-        toReturn.sort()
-        return toReturn
-    except socket.error:
+        with DirectNode(args=None) as node:
+            publisher_info = get_publisher_info(node=node, remote_node_name=node_name)
+            ros.get_logger('pub info: {}'.format(publisher_info))
+            return publisher_info
+    except Exception as e:
+        ros.get_logger().info('exception: {}'.format(e))
         return []
 
 
-def get_node_subscriptions(node):
+def get_node_subscriptions(ros, node_name):
     """ Returns a list of topic names that are been subscribed by the specified node """
     try:
-        publishers, subscribers, services = Master('/rosbridge').getSystemState()
-        toReturn = []
-        for i, v in subscribers:
-            if node in v:
-                toReturn.append(i)
-        toReturn.sort()
-        return toReturn
-    except socket.error:
+        with DirectNode(args=None) as node:
+            subscriber_info = get_subscriber_info(node=node, remote_node_name=node_name)
+            ros.get_logger('subscriber info: {}'.format(subscriber_info))
+            return subscriber_info
+    except Exception as e:
+        ros.get_logger().info('exception: {}'.format(e))
         return []
 
 
-def get_node_services(node):
+def get_node_services(ros, node_name):
     """ Returns a list of service names that are been hosted by the specified node """
     try:
-        publishers, subscribers, services = Master('/rosbridge').getSystemState()
-        toReturn = []
-        for i, v in services:
-            if node in v:
-                toReturn.append(i)
-        toReturn.sort()
-        return toReturn
-    except socket.error:
+        with DirectNode(args=None) as node:
+            service_info = get_service_info(node=node, remote_node_name=node_name)
+            ros.get_logger('Service info: {}'.format(service_info))
+            return service_info
+    except Exception as e:
+        ros.get_logger().info('exception: {}'.format(e))
         return []
 
 

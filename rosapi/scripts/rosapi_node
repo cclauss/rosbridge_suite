@@ -57,9 +57,9 @@ class Rosapi(Node):
         self.create_service(ServicesForType, '/rosapi/services_for_type', self.get_services_for_type)
         self.create_service(Nodes, '/rosapi/nodes', self.get_nodes)
         self.create_service(NodeDetails, '/rosapi/node_details', self.get_node_details)
+        self.create_service(GetActionServers, '/rosapi/action_servers', self.get_action_servers)
 
         # Topics to be implemented:
-        # rospy.Service('/rosapi/action_servers', GetActionServers, get_action_servers)
         # rospy.Service('/rosapi/topic_type', TopicType, get_topic_type)
         # rospy.Service('/rosapi/service_type', ServiceType, get_service_type)
         # rospy.Service('/rosapi/publishers', Publishers, get_publishers)
@@ -113,14 +113,16 @@ class Rosapi(Node):
         response.subscribing, response.publishing, response.services = proxy.get_node_info(request.node)
         return response
 
+    def get_action_servers(self, request, response):
+        """ Called by the rosapi/GetActionServers service. Returns a list of action servers based on actions standard topics """
+        topics = proxy.get_topics(self.globs.get('topics_glob'), include_hidden=True)
+        response.action_servers = proxy.filter_action_servers(topics)
+        return response
+
 
 # TODO(@jubeira): make all of these methods of the node and port them.
     
-def get_action_servers(request):
-    """ Called by the rosapi/GetActionServers service. Returns a list of action servers based on actions standard topics """
-    topics = proxy.get_topics(rosapi.glob_helper.topics_glob)
-    action_servers = proxy.filter_action_servers(topics)
-    return GetActionServersResponse(action_servers)
+
 def get_topic_type(request):
     """ Called by the rosapi/TopicType service.  Given the name of a topic, returns the name of the type of that topic.
     Request class has one field, 'topic', which is a string value (the name of the topic)

@@ -63,10 +63,10 @@ def init(node):
     global _node
     _node = node
 
-def get_topics(topics_glob):
+def get_topics(topics_glob, include_hidden=False):
     """ Returns a list of all the active topics in the ROS system """
     try:
-        topic_names = get_topic_names(node=_node, include_hidden_topics=False)
+        topic_names = get_topic_names(node=_node, include_hidden_topics=include_hidden)
         return filter_globs(topics_glob, topic_names)
     except:
         return []
@@ -82,9 +82,9 @@ def get_topics_types(topics, topics_glob):
         return[]
 
 
-def get_topics_and_types(topics_glob):
+def get_topics_and_types(topics_glob, include_hidden=False):
     try:
-        topic_names_and_types = get_topic_names_and_types(node=_node, include_hidden_topics=False)
+        topic_names_and_types = get_topic_names_and_types(node=_node, include_hidden_topics=include_hidden)
         # topic[0] has the topic name and topic[1] has the type wrapped in a list.
         all_topics = set([topic[0] for topic in topic_names_and_types])
         filtered_topics = set(filter_globs(topics_glob, all_topics))
@@ -94,9 +94,9 @@ def get_topics_and_types(topics_glob):
         return [], []
 
 
-def get_topics_for_type(topic_type, topics_glob):
+def get_topics_for_type(topic_type, topics_glob, include_hidden=False):
     try:
-        topic_names_and_types = get_topic_names_and_types(node=_node, include_hidden_topics=False)
+        topic_names_and_types = get_topic_names_and_types(node=_node, include_hidden_topics=include_hidden)
         # topic[0] has the topic name and topic[1] has the type wrapped in a list.
         topics_for_type = [topic[0] for topic in topic_names_and_types if topic[1][0] == topic_type]
         return filter_globs(topics_glob, topics_for_type)
@@ -104,21 +104,21 @@ def get_topics_for_type(topic_type, topics_glob):
         return []
 
 
-def get_services(services_glob):
+def get_services(services_glob, include_hidden=False):
     """ Returns a list of all the services advertised in the ROS system """
     # Filter the list of services by whether they are public before returning.
     try:
-        service_names = get_service_names(node=_node, include_hidden_services=False)
+        service_names = get_service_names(node=_node, include_hidden_services=include_hidden)
         return filter_globs(services_glob, service_names)
     except:
         return []
 
 
-def get_services_for_type(service_type, services_glob):
+def get_services_for_type(service_type, services_glob, include_hidden=False):
     """ Returns a list of services as specific service type """
     # Filter the list of services by whether they are public before returning.
     try:
-        services_names_and_types = get_service_names_and_types(node=_node, include_hidden_services=False)
+        services_names_and_types = get_service_names_and_types(node=_node, include_hidden_services=include_hidden)
         # service[0] has the topic name and service[1] has the type wrapped in a list.
         services_for_type = [service[0] for service in services_names_and_types if service[1][0] == service_type]
         return filter_globs(services_glob, services_for_type)
@@ -126,18 +126,18 @@ def get_services_for_type(service_type, services_glob):
         return []
 
 
-def get_nodes():
+def get_nodes(include_hidden=False):
     """ Returns a list of all the nodes registered in the ROS system """
     try:
-        node_names = get_node_names(node=_node, include_hidden_nodes=False)
+        node_names = get_node_names(node=_node, include_hidden_nodes=include_hidden)
         # Discard the node that requests the names.
         full_names = [node_name.full_name for node_name in node_names if node_name.full_name != '/requester_rosapi_Nodes']
         return full_names
     except:
         return []
 
-def get_node_info(node_name):
-    node_names = get_node_names(node=_node, include_hidden_nodes=True)
+def get_node_info(node_name, include_hidden=False):
+    node_names = get_node_names(node=_node, include_hidden_nodes=include_hidden)
     if node_name in [n.full_name for n in node_names]:
         # Only the name of each item is required as output.
         subscribers = get_subscriber_info(node=_node, remote_node_name=node_name)
@@ -163,13 +163,13 @@ def get_node_publications(node_name):
 def get_node_subscriptions(node_name):
     """ Returns a list of topic names that are been subscribed by the specified node """
     try:
-        subscriber_info = get_subscriber_info(node=node, remote_node_name=node_name)
+        subscriber_info = get_subscriber_info(node=_node, remote_node_name=node_name)
         return subscriber_info
     except:
         return []
 
 
-def get_node_services(ros, node_name):
+def get_node_services(node_name):
     """ Returns a list of service names that are been hosted by the specified node """
     try:
         service_info = get_service_info(node=_node, remote_node_name=node_name)
@@ -196,23 +196,30 @@ def get_topic_type(topic, topics_glob):
 
 def filter_action_servers(topics):
     """ Returns a list of action servers """
+    # Note(@jubeira): filtering by topic should be enough; services can be taken into account as well.
     action_servers = []
     possible_action_server = ''
-    possibility = [0, 0, 0, 0, 0]
+    possibility = [0, 0]
 
-    action_topics = ['cancel', 'feedback', 'goal', 'result', 'status']
+    action_topics = ['feedback', 'status']
     for topic in sorted(topics):
         split = topic.split('/')
-        if(len(split) >= 3):
+        if(len(split) >= 4):
             topic = split.pop()
+            action_prefix = split.pop()
+            if action_prefix != '_action':
+                continue
+
             namespace = '/'.join(split)
             if(possible_action_server != namespace):
                 possible_action_server = namespace
-                possibility = [0, 0, 0, 0, 0]
+                possibility = [0, 0]
             if possible_action_server == namespace and topic in action_topics:
+                _node.get_logger().info('Possibility 1 for topic: {} namespace: {}'.format(topic, namespace))
                 possibility[action_topics.index(topic)] = 1
-        if all(p == 1 for p in possibility):
-            action_servers.append(possible_action_server)
+            if all(p == 1 for p in possibility):
+                action_servers.append(possible_action_server)
+                possibility = [0, 0]
 
     return action_servers
 

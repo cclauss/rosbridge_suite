@@ -83,15 +83,7 @@ def get_topics_types(topics, topics_glob):
 
 
 def get_topics_and_types(topics_glob, include_hidden=False):
-    try:
-        topic_names_and_types = get_topic_names_and_types(node=_node, include_hidden_topics=include_hidden)
-        # topic[0] has the topic name and topic[1] has the type wrapped in a list.
-        all_topics = set([topic[0] for topic in topic_names_and_types])
-        filtered_topics = set(filter_globs(topics_glob, all_topics))
-        filtered_topic_types = [topic[1][0] for topic in topic_names_and_types if topic[0] in filtered_topics]
-        return filtered_topics, filtered_topic_types
-    except:
-        return [], []
+    return get_publications_and_types(topics_glob, get_topic_names_and_types, include_hidden_topics=include_hidden)
 
 
 def get_topics_for_type(topic_type, topics_glob, include_hidden=False):
@@ -114,6 +106,10 @@ def get_services(services_glob, include_hidden=False):
         return []
 
 
+def get_services_and_types(services_glob, include_hidden=False):
+    return get_publications_and_types(services_glob, get_service_names_and_types, include_hidden_services=include_hidden)
+
+
 def get_services_for_type(service_type, services_glob, include_hidden=False):
     """ Returns a list of services as specific service type """
     # Filter the list of services by whether they are public before returning.
@@ -126,6 +122,21 @@ def get_services_for_type(service_type, services_glob, include_hidden=False):
         return []
 
 
+def get_publications_and_types(glob, getter_function, **include_hidden_publications):
+    try:
+        publication_names_and_types = getter_function(node=_node, **include_hidden_publications)
+        # publication[0] has the publication name and publication[1] has the type wrapped in a list.
+        all_publications = [publication[0] for publication in publication_names_and_types]
+        filtered_publications = filter_globs(glob, all_publications)
+        filtered_publication_types = [publication[1][0] for publication
+                                      in publication_names_and_types
+                                      if publication[0] in filtered_publications]
+        return filtered_publications, filtered_publication_types
+    except Exception as e:
+        _node.get_logger().info('exception e: {}'.format(e))
+        return [], []
+
+
 def get_nodes(include_hidden=False):
     """ Returns a list of all the nodes registered in the ROS system """
     try:
@@ -135,6 +146,7 @@ def get_nodes(include_hidden=False):
         return full_names
     except:
         return []
+
 
 def get_node_info(node_name, include_hidden=False):
     node_names = get_node_names(node=_node, include_hidden_nodes=include_hidden)
@@ -150,6 +162,7 @@ def get_node_info(node_name, include_hidden=False):
         services = [service.name for service in services]
 
         return subscribers, publishers, services
+
 
 def get_node_publications(node_name):
     """ Returns a list of topic names that are been published by the specified node """
@@ -180,17 +193,12 @@ def get_node_services(node_name):
 
 def get_topic_type(topic, topics_glob):
     """ Returns the type of the specified ROS topic """
-    # Check if the topic is hidden or public.
-    # If all topics are public then the type is returned
-    if any_match(str(topic), topics_glob):
-        # If the topic is published, return its type
-        topic_type, _, _ = rosservice_get_topic_type(topic)
-        if topic_type is None:
-            # Topic isn't published so return an empty string
-            return ""
-        return topic_type
-    else:
-        # Topic is hidden so return an empty string
+    # Note: this doesn't consider hidden topics.
+    topics, types = get_topics_and_types(topics_glob)
+    try:
+        return types[topics.index(topic)]
+    except:
+        # Return empty string if the topic is not present.
         return ""
 
 
@@ -226,14 +234,13 @@ def filter_action_servers(topics):
 
 def get_service_type(service, services_glob):
     """ Returns the type of the specified ROS service, """
-    # Check if the service is hidden or public.
-    if any_match(str(service), services_glob):
-        try:
-            return rosservice_get_service_type(service)
-        except:
-            return ""
-    else:
-        # Service is hidden so return an empty string.
+    # Note: this doesn't consider hidden services.
+    services, types = get_services_and_types(services_glob)
+    _node.get_logger().info('services: {} types: {}'.format(services, types))
+    try:
+        return types[services.index(service)]
+    except:
+        # Return empty string if the service is not present.
         return ""
 
 

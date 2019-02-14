@@ -58,10 +58,10 @@ class Rosapi(Node):
         self.create_service(Nodes, '/rosapi/nodes', self.get_nodes)
         self.create_service(NodeDetails, '/rosapi/node_details', self.get_node_details)
         self.create_service(GetActionServers, '/rosapi/action_servers', self.get_action_servers)
+        self.create_service(TopicType, '/rosapi/topic_type', self.get_topic_type)
+        self.create_service(ServiceType, '/rosapi/service_type', self.get_service_type)
 
         # Topics to be implemented:
-        # rospy.Service('/rosapi/topic_type', TopicType, get_topic_type)
-        # rospy.Service('/rosapi/service_type', ServiceType, get_service_type)
         # rospy.Service('/rosapi/publishers', Publishers, get_publishers)
         # rospy.Service('/rosapi/subscribers', Subscribers, get_subscribers)
         # rospy.Service('/rosapi/service_providers', ServiceProviders, get_service_providers)
@@ -119,23 +119,24 @@ class Rosapi(Node):
         response.action_servers = proxy.filter_action_servers(topics)
         return response
 
+    def get_topic_type(self, request, response):
+        """ Called by the rosapi/TopicType service.  Given the name of a topic, returns the name of the type of that topic.
+        Request class has one field, 'topic', which is a string value (the name of the topic)
+        Response class has one field, 'type', which is a string value (the type of the topic)
+        If the topic does not exist, an empty string is returned. """
+        response.type = proxy.get_topic_type(request.topic, self.globs.get('topics_glob'))
+        return response
+
+    def get_service_type(self, request, response):
+        """ Called by the rosapi/ServiceType service.  Given the name of a service, returns the type of that service
+        Request class has one field, 'service', which is a string value (the name of the service)
+        Response class has one field, 'type', which is a string value (the type of the service)
+        If the service does not exist, an empty string is returned. """
+        response.type = proxy.get_service_type(request.service, self.globs.get('services_glob'))
+        return response
 
 # TODO(@jubeira): make all of these methods of the node and port them.
     
-
-def get_topic_type(request):
-    """ Called by the rosapi/TopicType service.  Given the name of a topic, returns the name of the type of that topic.
-    Request class has one field, 'topic', which is a string value (the name of the topic)
-    Response class has one field, 'type', which is a string value (the type of the topic)
-    If the topic does not exist, an empty string is returned. """
-    return TopicTypeResponse(proxy.get_topic_type(request.topic, rosapi.glob_helper.topics_glob))
-    
-def get_service_type(request):
-    """ Called by the rosapi/ServiceType service.  Given the name of a service, returns the type of that service
-    Request class has one field, 'service', which is a string value (the name of the service)
-    Response class has one field, 'type', which is a string value (the type of the service)
-    If the service does not exist, an empty string is returned. """
-    return ServiceTypeResponse(proxy.get_service_type(request.service, rosapi.glob_helper.services_glob))
 
 def get_publishers(request):
     """ Called by the rosapi/Publishers service.  Given the name of a topic, returns a list of node names

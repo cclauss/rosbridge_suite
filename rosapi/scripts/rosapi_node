@@ -60,12 +60,12 @@ class Rosapi(Node):
         self.create_service(GetActionServers, '/rosapi/action_servers', self.get_action_servers)
         self.create_service(TopicType, '/rosapi/topic_type', self.get_topic_type)
         self.create_service(ServiceType, '/rosapi/service_type', self.get_service_type)
+        self.create_service(Publishers, '/rosapi/publishers', self.get_publishers)
+        self.create_service(Subscribers, '/rosapi/subscribers', self.get_subscribers)
+        self.create_service(ServiceProviders, '/rosapi/service_providers', self.get_service_providers)
+        self.create_service(ServiceNode, '/rosapi/service_node', self.get_service_node)
 
         # Topics to be implemented:
-        # rospy.Service('/rosapi/publishers', Publishers, get_publishers)
-        # rospy.Service('/rosapi/subscribers', Subscribers, get_subscribers)
-        # rospy.Service('/rosapi/service_providers', ServiceProviders, get_service_providers)
-        # rospy.Service('/rosapi/service_node', ServiceNode, get_service_node)
         # rospy.Service('/rosapi/service_host', ServiceHost, get_service_host)
         # rospy.Service('/rosapi/message_details', MessageDetails, get_message_details)
         # rospy.Service('/rosapi/service_request_details', ServiceRequestDetails, get_service_request_details)
@@ -135,28 +135,33 @@ class Rosapi(Node):
         response.type = proxy.get_service_type(request.service, self.globs.get('services_glob'))
         return response
 
+    def get_publishers(self, request, response):
+        """ Called by the rosapi/Publishers service.  Given the name of a topic, returns a list of node names
+        that are publishing on that topic. """
+        response.publishers = proxy.get_publishers(request.topic, self.globs.get('topics_glob'))
+        return response
+
+    def get_subscribers(self, request, response):
+        """ Called by the rosapi/Subscribers service.  Given the name of a topic, returns a list of node names
+        that are subscribing to that topic. """
+        response.subscribers = proxy.get_subscribers(request.topic, self.globs.get('topics_glob'))
+        return response
+
+    def get_service_providers(self, request, response):
+        """ Called by the rosapi/ServiceProviders service.  Given the name of a topic, returns a list of node names
+        that are advertising that service type """
+        response.providers = proxy.get_service_providers(request.service, self.globs.get('services_glob'))
+        return response
+
+    def get_service_node(self, request, response):
+        """ Called by the rosapi/ServiceNode service.  Given the name of a service, returns the name of the node
+        that is providing that service. """
+        response.node = proxy.get_service_node(request.service, self.globs.get('services_glob'))
+        return response
+
+
 # TODO(@jubeira): make all of these methods of the node and port them.
-    
 
-def get_publishers(request):
-    """ Called by the rosapi/Publishers service.  Given the name of a topic, returns a list of node names
-    that are publishing on that topic. """
-    return PublishersResponse(proxy.get_publishers(request.topic, rosapi.glob_helper.topics_glob))
-
-def get_subscribers(request):
-    """ Called by the rosapi/Subscribers service.  Given the name of a topic, returns a list of node names
-    that are subscribing to that topic. """
-    return SubscribersResponse(proxy.get_subscribers(request.topic, rosapi.glob_helper.topics_glob))
-
-def get_service_providers(request):
-    """ Called by the rosapi/ServiceProviders service.  Given the name of a topic, returns a list of node names
-    that are advertising that service type """
-    return ServiceProvidersResponse(proxy.get_service_providers(request.service, rosapi.glob_helper.services_glob))
-
-def get_service_node(request):
-    """ Called by the rosapi/ServiceNode service.  Given the name of a service, returns the name of the node
-    that is providing that service. """
-    return ServiceNodeResponse(proxy.get_service_node(request.service))
 
 def get_service_host(request):
     """ Called by the rosapi/ServiceNode service.  Given the name of a service, returns the name of the machine

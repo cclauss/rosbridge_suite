@@ -38,17 +38,6 @@ from ros2node.api import get_node_names, get_publisher_info, get_service_info, g
 from ros2service.api import get_service_names, get_service_names_and_types
 from ros2topic.api import get_topic_names, get_topic_names_and_types
 
-# from rosservice import get_service_list
-# from rosservice import get_service_type as rosservice_get_service_type
-# from rosservice import get_service_node as rosservice_get_service_node
-# from rosservice import get_service_uri
-# from rosservice import rosservice_find
-# from rostopic import find_by_type
-# from rostopic import get_topic_type as rosservice_get_topic_type
-# from ros import rosnode, rosgraph
-# from rosnode import get_node_names
-# from rosgraph.masterapi import Master
-
 from rosapi.msg import TypeDef
 
 from .glob_helper import filter_globs, any_match
@@ -132,8 +121,7 @@ def get_publications_and_types(glob, getter_function, **include_hidden_publicati
                                       in publication_names_and_types
                                       if publication[0] in filtered_publications]
         return filtered_publications, filtered_publication_types
-    except Exception as e:
-        _node.get_logger().info('exception e: {}'.format(e))
+    except:
         return [], []
 
 
@@ -141,8 +129,7 @@ def get_nodes(include_hidden=False):
     """ Returns a list of all the nodes registered in the ROS system """
     try:
         node_names = get_node_names(node=_node, include_hidden_nodes=include_hidden)
-        # Discard the node that requests the names.
-        full_names = [node_name.full_name for node_name in node_names if node_name.full_name != '/requester_rosapi_Nodes']
+        full_names = [node_name.full_name for node_name in node_names]
         return full_names
     except:
         return []
@@ -152,14 +139,9 @@ def get_node_info(node_name, include_hidden=False):
     node_names = get_node_names(node=_node, include_hidden_nodes=include_hidden)
     if node_name in [n.full_name for n in node_names]:
         # Only the name of each item is required as output.
-        subscribers = get_subscriber_info(node=_node, remote_node_name=node_name)
-        subscribers = [subscriber.name for subscriber in subscribers]
-
-        publishers = get_publisher_info(node=_node, remote_node_name=node_name)
-        publishers = [publisher.name for publisher in publishers]
-
-        services = get_service_info(node=_node, remote_node_name=node_name)
-        services = [service.name for service in services]
+        subscribers = get_node_subscriptions(node_name)
+        publishers = get_node_publications(node_name)
+        services = get_node_services(node_name)
 
         return subscribers, publishers, services
 
@@ -167,8 +149,8 @@ def get_node_info(node_name, include_hidden=False):
 def get_node_publications(node_name):
     """ Returns a list of topic names that are been published by the specified node """
     try:
-        publisher_info = get_publisher_info(node=_node, remote_node_name=node_name)
-        return publisher_info
+        publishers = get_publisher_info(node=_node, remote_node_name=node_name)
+        return [publisher.name for publisher in publishers]
     except:
         return []
 
@@ -176,8 +158,8 @@ def get_node_publications(node_name):
 def get_node_subscriptions(node_name):
     """ Returns a list of topic names that are been subscribed by the specified node """
     try:
-        subscriber_info = get_subscriber_info(node=_node, remote_node_name=node_name)
-        return subscriber_info
+        subscribers = get_subscriber_info(node=_node, remote_node_name=node_name)
+        return [subscriber.name for subscriber in subscribers]
     except:
         return []
 
@@ -185,8 +167,17 @@ def get_node_subscriptions(node_name):
 def get_node_services(node_name):
     """ Returns a list of service names that are been hosted by the specified node """
     try:
-        service_info = get_service_info(node=_node, remote_node_name=node_name)
-        return service_info
+        services = get_service_info(node=_node, remote_node_name=node_name)
+        return [service.name for service in services]
+    except:
+        return []
+
+
+def get_node_service_types(node_name):
+    """ Returns a list of service types that are been hosted by the specified node """
+    try:
+        services = get_service_info(node=_node, remote_node_name=node_name)
+        return [service.types[0] for service in services]
     except:
         return []
 
@@ -223,7 +214,6 @@ def filter_action_servers(topics):
                 possible_action_server = namespace
                 possibility = [0, 0]
             if possible_action_server == namespace and topic in action_topics:
-                _node.get_logger().info('Possibility 1 for topic: {} namespace: {}'.format(topic, namespace))
                 possibility[action_topics.index(topic)] = 1
             if all(p == 1 for p in possibility):
                 action_servers.append(possible_action_server)
@@ -236,7 +226,6 @@ def get_service_type(service, services_glob):
     """ Returns the type of the specified ROS service, """
     # Note: this doesn't consider hidden services.
     services, types = get_services_and_types(services_glob)
-    _node.get_logger().info('services: {} types: {}'.format(services, types))
     try:
         return types[services.index(service)]
     except:
@@ -244,57 +233,46 @@ def get_service_type(service, services_glob):
         return ""
 
 
-def get_publishers(topic, topics_glob):
+def get_channel_info(channel, channels_glob, getter_function, include_hidden=False):
+    """ Returns a list of node names that are publishing / subscribing to the specified topic,
+        or advertising a given service. """
+    try:
+        if any_match(str(channel), channels_glob):
+            channel_info_list = []
+            node_list = get_nodes(include_hidden)
+            for node in node_list:
+                channel_info = getter_function(node)
+                if channel in channel_info:
+                    channel_info_list.append(node)
+            return channel_info_list
+        else:
+            return []
+    except:
+        return []
+
+
+def get_publishers(topic, topics_glob, include_hidden=False):
     """ Returns a list of node names that are publishing the specified topic """
-    try:
-        if any_match(str(topic), topics_glob):
-            publishers, subscribers, services = Master('/rosbridge').getSystemState()
-            pubdict = dict(publishers)
-            if topic in pubdict:
-                return pubdict[topic]
-            else:
-                return []
-        else:
-            return []
-    except socket.error:
-        return []
+    return get_channel_info(topic, topics_glob, get_node_publications, include_hidden=include_hidden)
 
 
-def get_subscribers(topic, topics_glob):
+def get_subscribers(topic, topics_glob, include_hidden=False):
     """ Returns a list of node names that are subscribing to the specified topic """
-    try:
-        if any_match(str(topic), topics_glob):
-            publishers, subscribers, services = Master('/rosbridge').getSystemState()
-            subdict = dict(subscribers)
-            if topic in subdict:
-                return subdict[topic]
-            else:
-                return []
-        else:
-            return []
-    except socket.error:
-        return []
+    return get_channel_info(topic, topics_glob, get_node_subscriptions, include_hidden=include_hidden)
 
 
-def get_service_providers(queried_type, services_glob):
+def get_service_providers(queried_type, services_glob, include_hidden=False):
     """ Returns a list of node names that are advertising a service with the specified type """
-    _, _, services = Master('/rosbridge').getSystemState()
-
-    service_type_providers = []
-    for service, providers in services:
-        service_type = get_service_type(service, services_glob)
-
-        if service_type == queried_type:
-            service_type_providers += providers
-    return service_type_providers
+    return get_channel_info(queried_type, services_glob, get_node_service_types, include_hidden=include_hidden)
 
 
-def get_service_node(service):
+def get_service_node(queried_type, services_glob, include_hidden=False):
     """ Returns the name of the node that is providing the given service, or empty string """
-    node = rosservice_get_service_node(service)
-    if node == None:
-        node = ""
-    return node
+    node_name = get_channel_info(queried_type, services_glob, get_node_services, include_hidden=include_hidden)
+    if node_name:
+        return node_name[0]
+    else:
+        return ""
 
 
 def get_service_host(service):

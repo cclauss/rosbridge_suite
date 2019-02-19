@@ -64,12 +64,12 @@ class Rosapi(Node):
         self.create_service(Subscribers, '/rosapi/subscribers', self.get_subscribers)
         self.create_service(ServiceProviders, '/rosapi/service_providers', self.get_service_providers)
         self.create_service(ServiceNode, '/rosapi/service_node', self.get_service_node)
+        self.create_service(MessageDetails, '/rosapi/message_details', self.get_message_details)
+        self.create_service(ServiceRequestDetails, '/rosapi/service_request_details', self.get_service_request_details)
+        self.create_service(ServiceResponseDetails, '/rosapi/service_response_details', self.get_service_response_details)
 
         # Topics to be implemented:
         # rospy.Service('/rosapi/service_host', ServiceHost, get_service_host)
-        # rospy.Service('/rosapi/message_details', MessageDetails, get_message_details)
-        # rospy.Service('/rosapi/service_request_details', ServiceRequestDetails, get_service_request_details)
-        # rospy.Service('/rosapi/service_response_details', ServiceResponseDetails, get_service_response_details)
         # rospy.Service('/rosapi/set_param', SetParam, set_param)
         # rospy.Service('/rosapi/get_param', GetParam, get_param)
         # rospy.Service('/rosapi/has_param', HasParam, has_param)
@@ -159,30 +159,32 @@ class Rosapi(Node):
         response.node = proxy.get_service_node(request.service, self.globs.get('services_glob'))
         return response
 
+    def get_message_details(self, request, response):
+        """ Called by the rosapi/MessageDetails service.  Given the name of a message type, returns the TypeDef
+        for that type."""
+        response.typedefs = [dict_to_typedef(d) for d in objectutils.get_typedef_recursive(request.type)]
+        return response
+
+    def get_service_request_details(self, request, response):
+        """ Called by the rosapi/ServiceRequestDetails service. Given the name of a service type, returns the TypeDef
+        for the request message of that service type. """
+        response.typedefs = [dict_to_typedef(d) for d in objectutils.get_service_request_typedef_recursive(request.type)]
+        return response
+
+    def get_service_response_details(self, request, response):
+        """ Called by the rosapi/ServiceResponseDetails service. Given the name of a service type, returns the TypeDef
+        for the response message of that service type. """
+        response.typedefs = [dict_to_typedef(d) for d in objectutils.get_service_response_typedef_recursive(request.type)]
+        return response
+
 
 # TODO(@jubeira): make all of these methods of the node and port them.
 
-
+# Note(@jubeira): there is no equivalent for this in ROS2 so far. The service doesn't seem to e used anywhere in rosbridge.
 def get_service_host(request):
     """ Called by the rosapi/ServiceNode service.  Given the name of a service, returns the name of the machine
     that is hosting that service. """
     return ServiceHostResponse(proxy.get_service_host(request.service))
-
-def get_message_details(request):
-    """ Called by the rosapi/MessageDetails service.  Given the name of a message type, returns the TypeDef
-    for that type."""
-    typedefs = [dict_to_typedef(d) for d in objectutils.get_typedef_recursive(request.type)]
-    return MessageDetailsResponse(typedefs)
-
-def get_service_request_details(request):
-    """ Called by the rosapi/ServiceRequestDetails service. Given the name of a service type, returns the TypeDef
-    for the request message of that service type. """
-    return ServiceRequestDetailsResponse([dict_to_typedef(d) for d in objectutils.get_service_request_typedef_recursive(request.type)])
-
-def get_service_response_details(request):
-    """ Called by the rosapi/ServiceResponseDetails service. Given the name of a service type, returns the TypeDef
-    for the response message of that service type. """
-    return ServiceResponseDetailsResponse([dict_to_typedef(d) for d in objectutils.get_service_response_typedef_recursive(request.type)])
 
 def set_param(request):
     rosapi.params.set_param(request.name, request.value, rosapi.glob_helper.params_glob)

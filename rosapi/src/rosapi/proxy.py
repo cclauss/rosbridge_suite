@@ -44,6 +44,7 @@ from .glob_helper import filter_globs, any_match
 
 _node = None
 
+
 def init(node):
     """
     Initializes proxy module with a rclpy.node.Node for further use.
@@ -51,6 +52,7 @@ def init(node):
     """
     global _node
     _node = node
+
 
 def get_topics(topics_glob, include_hidden=False):
     """ Returns a list of all the active topics in the ROS system """

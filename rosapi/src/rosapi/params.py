@@ -30,13 +30,19 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import asyncio
 import fnmatch
 from json import loads, dumps
 import threading
 
 from rcl_interfaces.msg import Parameter
 import rclpy
-from ros2param.api import call_get_parameters, call_set_parameters, get_parameter_value
+from ros2param.api import call_get_parameters, get_parameter_value
+
+from rcl_interfaces.msg import ParameterType
+from rcl_interfaces.msg import ParameterValue
+from rcl_interfaces.srv import GetParameters
+from rcl_interfaces.srv import SetParameters
 
 """ Methods to interact with the param server.  Values have to be passed
 as JSON in order to facilitate dynamically typed SRV messages """
@@ -55,11 +61,42 @@ def init(node):
     This function has to be called before any other for the module to work.
     """
     global _node
-    # _node = node
-    _node = rclpy.create_node('rosapi_params')
+    _node = node
+    # _node = rclpy.create_node('rosapi_params')
 
 
-def set_param(node_name, name, value, params_glob):
+async def call_set_parameters(*, node, node_name, parameters):
+    # create client
+    client = node.create_client(
+        SetParameters,
+        '{node_name}/set_parameters'.format_map(locals()))
+
+    # call as soon as ready
+    ready = client.wait_for_service(timeout_sec=5.0)
+    if not ready:
+        raise RuntimeError('Wait for service timed out')
+
+    request = SetParameters.Request()
+    request.parameters = parameters
+    future = client.call_async(request)
+    # rclpy.spin_until_future_complete(node, future)
+    node.get_logger().info('About to await future')
+
+    await future
+
+    node.get_logger().info('Got something from the future')
+
+    # handle response
+    response = future.result()
+    if response is None:
+        e = future.exception()
+        raise RuntimeError(
+            'Exception while calling service of node '
+            "'{args.node_name}': {e}".format_map(locals()))
+    return response
+
+
+async def set_param(node_name, name, value, params_glob):
     if params_glob and not any(fnmatch.fnmatch(str(name), glob) for glob in params_glob):
         # If the glob list is not empty and there are no glob matches,
         # stop the attempt to set the parameter.
@@ -77,8 +114,9 @@ def set_param(node_name, name, value, params_glob):
         parameter.value = get_parameter_value(string_value=value)
         try:
             # call_get_parameters will fail if node does not exist.
-            call_set_parameters(node=_node, node_name=node_name, parameters=[parameter])
-        except:
+            await call_set_parameters(node=_node, node_name=node_name, parameters=[parameter])
+        except Exception as e:
+            _node.get_logger().info('Exception: {}'.format(e))
             pass
 
 

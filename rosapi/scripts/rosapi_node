@@ -36,6 +36,9 @@ import sys
 
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
+
+from rcl_interfaces.srv import SetParameters
 
 from rosapi import glob_helper, proxy, objectutils, params
 from rosapi.srv import *
@@ -71,7 +74,9 @@ class Rosapi(Node):
         self.create_service(SetParam, '/rosapi/set_param', self.set_param)
         self.create_service(GetParam, '/rosapi/get_param', self.get_param)
         self.create_service(HasParam, '/rosapi/has_param', self.has_param)
-
+        self.client = self.create_client(
+            SetParameters,
+            '/talker/set_parameters')
         # Topics to be implemented:
         # rospy.Service('/rosapi/service_host', ServiceHost, get_service_host)
         # rospy.Service('/rosapi/search_param', SearchParam, search_param)
@@ -179,7 +184,7 @@ class Rosapi(Node):
         return response
 
     async def set_param(self, request, response):
-        await params.set_param(request.node_name, request.name, request.value, self.globs.get('params_glob'))
+        await params.set_param(request.node_name, request.name, request.value, self.globs.get('params_glob'), self.client)
         self.get_logger().info('Returning empty response')
         return response
 

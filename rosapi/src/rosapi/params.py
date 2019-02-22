@@ -65,11 +65,11 @@ def init(node):
     # _node = rclpy.create_node('rosapi_params')
 
 
-async def call_set_parameters(*, node, node_name, parameters):
+async def call_set_parameters(*, node, node_name, parameters, client):
     # create client
-    client = node.create_client(
-        SetParameters,
-        '{node_name}/set_parameters'.format_map(locals()))
+    # client = node.create_client(
+    #     SetParameters,
+    #     '{node_name}/set_parameters'.format_map(locals()))
 
     # call as soon as ready
     ready = client.wait_for_service(timeout_sec=5.0)
@@ -96,7 +96,7 @@ async def call_set_parameters(*, node, node_name, parameters):
     return response
 
 
-async def set_param(node_name, name, value, params_glob):
+async def set_param(node_name, name, value, params_glob, client):
     if params_glob and not any(fnmatch.fnmatch(str(name), glob) for glob in params_glob):
         # If the glob list is not empty and there are no glob matches,
         # stop the attempt to set the parameter.
@@ -114,7 +114,7 @@ async def set_param(node_name, name, value, params_glob):
         parameter.value = get_parameter_value(string_value=value)
         try:
             # call_get_parameters will fail if node does not exist.
-            await call_set_parameters(node=_node, node_name=node_name, parameters=[parameter])
+            await call_set_parameters(node=_node, node_name=node_name, parameters=[parameter], client=client)
         except Exception as e:
             _node.get_logger().info('Exception: {}'.format(e))
             pass

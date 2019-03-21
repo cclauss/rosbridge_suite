@@ -34,6 +34,7 @@
 from __future__ import print_function
 
 import sys
+import time
 
 from socket import error
 
@@ -266,18 +267,18 @@ class RosbridgeWebsocketNode(Node):
         application = Application([(r"/", RosbridgeWebSocket), (r"", RosbridgeWebSocket)])
 
         connected = False
-        while not connected and not rospy.is_shutdown():
+        while not connected and self.context.ok():
             try:
                 if certfile is not None and keyfile is not None:
                     application.listen(port, address, ssl_options={ "certfile": certfile, "keyfile": keyfile})
                 else:
                     application.listen(port, address)
-                rospy.loginfo("Rosbridge WebSocket server started on port %d", port)
+                self.get_logger().info("Rosbridge WebSocket server started on port %d", port)
                 connected = True
             except error as e:
-                rospy.logwarn("Unable to start server: " + str(e) +
+                self.get_logger().warn("Unable to start server: " + str(e) +
                               " Retrying in " + str(retry_startup_delay) + "s.")
-                rospy.sleep(retry_startup_delay)
+                time.sleep(retry_startup_delay)
 
         IOLoop.instance().start()
 

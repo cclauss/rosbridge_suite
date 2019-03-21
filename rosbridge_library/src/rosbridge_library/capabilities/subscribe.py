@@ -36,7 +36,6 @@ PYTHON2 = sys.version_info < (3, 0)
 import fnmatch
 from threading import Lock
 from functools import partial
-from rospy import loginfo
 from rosbridge_library.capability import Capability
 from rosbridge_library.internal.subscribers import manager
 from rosbridge_library.internal.subscription_modifiers import MessageHandler
